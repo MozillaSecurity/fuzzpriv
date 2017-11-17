@@ -15,6 +15,8 @@ const dump = (window.dump && ((msg) => window.dump(msg + '\n'))) || console.log
 
 const grzHarnessUsesWindows = false
 
+let cache = {}
+
 function quitApplication () {
   browser.windows.getAll()
     .then((windows) => {
@@ -95,6 +97,28 @@ browser.runtime.onConnect.addListener((port) => {
             height: clamp(200, m.height, 2250)
           })
         })
+      }
+    } else if (m.cmd === 'cacheSet') {
+      if (!('key' in m)) {
+        dump('error in cacheSet: missing parameter: key')
+      } else if (!('value' in m)) {
+        dump('error in cacheSet: missing parameter: value')
+      } else {
+        cache[m.key] = m.value
+      }
+    } else if (m.cmd === 'cacheGet') {
+      if (!('key' in m)) {
+        dump('error in cacheGet: missing parameter: key')
+      } else if (!('token' in m)) {
+        dump('error in cacheGet: missing parameter: token')
+      } else {
+        let result
+        if (m.key in cache) {
+          result = cache[m.key]
+        } else {
+          result = undefined
+        }
+        port.postMessage({cmd: 'cacheGet', value: result, token: m.token})
       }
     } else if (m.cmd === 'zoom') {
       if ('factor' in m) {

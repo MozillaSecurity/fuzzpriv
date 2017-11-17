@@ -14,6 +14,7 @@
 const dump = (window.dump && ((msg) => window.dump(msg + '\n'))) || console.log
 
 let port = browser.runtime.connect()
+let cacheRequests = []
 
 let harnessTimeout = (() => {
   if (!location.hash.startsWith('#')) {
@@ -220,6 +221,16 @@ window.wrappedJSObject.fuzzPriv = cloneInto({
     window.close()
   },
 
+  // Large object caching
+  get: (key) => {
+    return new window.wrappedJSObject.Promise(exportFunction((resolve, reject) => {
+      port.postMessage({cmd: 'cacheGet', key: key, token: cacheRequests.push([resolve, reject])})
+    }, window.wrappedJSObject))
+  },
+  set: (key, value) => {
+    port.postMessage({cmd: 'cacheSet', key: key, value: value})
+  },
+
   // Garbage collection
   forceGC: gc,
   GC: gc,
@@ -248,5 +259,25 @@ window.wrappedJSObject.fuzzPriv = cloneInto({
 }, window, {cloneFunctions: true})
 
 port.onMessage.addListener((m) => {
-  dump('unhandled message from background: ' + m)
+  if (m.cmd === 'cacheGet') {
+    let resolve, reject
+    try {
+      [resolve, reject] = cacheRequests[m.token - 1]
+      cacheRequests[m.token - 1] = undefined
+    } catch(e) {
+      dump('unknown cache get token! ' + m.token + ' when requests array length is ' + cacheRequests.length + ' (' + e + ')')
+      return
+    }
+    if ('value' in m) {
+      resolve(m.value)
+    } else {
+      reject('response did not contain a value')
+    }
+    // clean-up the requests array
+    while (cacheRequests.length && cacheRequests[cacheRequests.length - 1] === undefined) {
+      cacheRequests.pop()
+    }
+  } else {
+    dump('unhandled message from background: ' + m)
+  }
 })
