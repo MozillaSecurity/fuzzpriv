@@ -85,6 +85,18 @@ let gc = (() => {
   }
 })()
 
+let enableAccessibility = (() => {
+  let warned = false
+  return () => {
+    if ('FuzzingFunctions' in window) {
+      FuzzingFunctions.enableAccessibility() // firefox with --enable-fuzzing & fuzzing.enabled=true
+    } else if (!warned) {
+      dump('No accessibility-enabling function available.')
+      warned = true
+    }
+  }
+})()
+
 function comparePixels () {
   /*
    * NOT WORKING!
@@ -249,8 +261,8 @@ window.wrappedJSObject.fuzzPriv = cloneInto({
 /*
   trustedKeyEvent: trustedKeyEvent(aWindow),
   callDrawWindow: callDrawWindow(aWindow),
-  enableAccessibility: enableAccessibility.bind(this),
 */
+  enableAccessibility: enableAccessibility,
   zoom: (factor) => port.postMessage({cmd: 'zoom', factor: factor})
 /*
   enableBookmarksToolbar: function() { sendAsyncMessage('DOMFuzzHelper.enableBookmarksToolbar', {}) },
