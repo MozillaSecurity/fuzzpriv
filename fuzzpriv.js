@@ -27,7 +27,7 @@ function quitApplication () {
     .catch((e) => dump('error in quitApplication: ' + e))
 }
 
-function kickoffGrizzlyHarness (timeout, location) {
+function kickoffGrizzlyHarness (timeout, loc) {
   const grzdump = (msg) => dump('[grizzly harness][' + new Date().toGMTString() + '] ' + msg)
 
   let limitTmr, sub
@@ -42,8 +42,8 @@ function kickoffGrizzlyHarness (timeout, location) {
 
   function grzHarness () {
     // grizzly harness
-    (grzHarnessUsesWindows ? browser.windows.create({allowScriptsToClose: true, url: location + reqUrl})
-                           : browser.tabs.create({url: location + reqUrl}))
+    (grzHarnessUsesWindows ? browser.windows.create({allowScriptsToClose: true, url: loc + reqUrl})
+                           : browser.tabs.create({url: loc + reqUrl}))
       .then((result) => { sub = result })
       .catch((e) => grzdump('error launching test case: ' + e))
 
@@ -81,7 +81,7 @@ browser.runtime.onConnect.addListener((port) => {
     } else if (m.cmd === 'quitApplicationSoon') {
       setTimeout(quitApplication, 4000)
     } else if (m.cmd === 'grizzlyHarness') {
-      kickoffGrizzlyHarness(m.timeout, m.location).catch((e) => dump('error in kickoffGrizzlyHarness: ' + e))
+      kickoffGrizzlyHarness(m.timeout, m.location)
     } else if (m.cmd === 'resizeTo') {
       if (!('width' in m)) {
         dump('error in resizeTo: missing parameter: width')

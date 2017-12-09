@@ -1,0 +1,2 @@
+git+https://github.com/MozillaSecurity/ffpuppet.git
+pytest

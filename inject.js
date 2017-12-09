@@ -16,7 +16,7 @@ const dump = (window.dump && ((msg) => window.dump(msg + '\n'))) || console.log
 let port = browser.runtime.connect()
 let cacheRequests = []
 
-let harnessTimeout = (() => {
+const harnessTimeout = (() => {
   if (!location.hash.startsWith('#')) {
     return undefined
   }
@@ -26,6 +26,8 @@ let harnessTimeout = (() => {
   }
   return result
 })()
+
+const isLocal = (location.hostname === '127.0.0.1' || location.hostname === 'localhost')
 
 /*
  * Possibly inject the fuzzer script into the page
@@ -53,9 +55,9 @@ if (location.protocol === 'file:' && location.hash.startsWith('#fuzz=')) {
     script.textContent = scriptToInject
     insertionPoint.appendChild(script)
   })
-} else if (location.protocol === 'http:' && (location.hostname === '127.0.0.1' || location.hostname === 'localhost') && harnessTimeout !== undefined) {
-  document.title = '🐻 ⋅ Grizzly ⋅ 🦊'
-  document.body.outerHTML = '<meta charset=UTF-8><style>html{background:black;color:#f0f;}blink{-webkit-animation:2s linear infinite e;animation:2s linear infinite e}@-webkit-keyframes e{0%{visibility:hidden}50%{visibility:hidden}100%{visibility:visible}}@keyframes e{0%{visibility:hidden}50%{visibility:hidden}100%{visibility:visible}}</style><h1>Welcome to Grizzly</h1><blink>fuzzing in progress</blink>'
+} else if (location.protocol === 'http:' && isLocal && harnessTimeout !== undefined) {
+  dump('using grizzly harness')
+  location.replace(browser.extension.getURL('/harnessui.html'))
   port.postMessage({cmd: 'grizzlyHarness', timeout: harnessTimeout, location: 'http://' + location.host})
 }
 
