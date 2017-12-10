@@ -2,6 +2,7 @@
 '''
 Test TODO:
 
+- makefile
 - fuzzPriv global object not injected for non-local url (how?)
 - request to file:#fuzz= gets argument fetched and injected as script
 - caching api

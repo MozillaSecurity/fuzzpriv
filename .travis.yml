@@ -1,0 +1,12 @@
+language: python
+python:
+    - 3.6
+branches:
+    only:
+        - master
+before_script:
+    - pip install fuzzfetch
+    - pip install -r tests/requirements.txt
+    - fuzzfetch -n build --fuzzing -a
+script:
+    - FIREFOX="$PWD/build/firefox" pytest -v
