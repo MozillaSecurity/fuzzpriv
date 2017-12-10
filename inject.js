@@ -57,7 +57,7 @@ if (location.protocol === 'file:' && location.hash.startsWith('#fuzz=')) {
   })
 } else if (location.protocol === 'http:' && isLocal && harnessTimeout !== undefined) {
   dump('using grizzly harness')
-  location.replace(browser.extension.getURL('/harnessui.html'))
+  location.replace(browser.extension.getURL('/harnessui.html') + location.hash)
   port.postMessage({cmd: 'grizzlyHarness', timeout: harnessTimeout, location: 'http://' + location.host})
 }
 
