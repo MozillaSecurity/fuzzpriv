@@ -4,10 +4,11 @@ Test TODO:
 
 - fuzzPriv global object not injected for non-local url (how?)
 - request to file:#fuzz= gets argument fetched and injected as script
-- fuzzPriv.quitApplication closes the browser
-- fuzzPriv.quitApplicationSoon closes the browser soon
-- fuzzPriv.closeTab
-- rigorous grizzly harness tests
+- caching api
+- resizeTo
+- zoom
+- forceGC/GC/CC
+- enableAccessibility
 '''
 import http.server
 import logging
@@ -43,7 +44,7 @@ def run_ffp(binary, prefs, location):
     Run firefox and return dict of available logs.
     '''
     result = {}
-    ffp = ffpuppet.FFPuppet()#use_xvfb=True)
+    ffp = ffpuppet.FFPuppet(use_xvfb=True)
     ffp.add_abort_token(re.compile(r'###!!!\s*\[Parent\].+?Error:\s*\(.+?name=PBrowser::Msg_Destroy\)'))
 
     try:
@@ -55,7 +56,7 @@ def run_ffp(binary, prefs, location):
             extension=EXT_PATH)
         ffp.check_prefs(prefs)
         log.info('Running Firefox (pid: %d)...', ffp.get_pid())
-        ffp.wait()
+        assert ffp.wait(timeout=10) is not None
     finally:
         log.info('Shutting down...')
         ffp.close()
@@ -80,7 +81,7 @@ def dump_logs(logs):
             log.debug('%s: %s', logfile, line)
 
 
-def test_fuzzpriv_injected_file(tmpdir):
+def test_fuzzpriv_injected(tmpdir):
     '''
     Check that fuzzPriv is injected in file:// and http://localhost urls.
     '''
@@ -140,6 +141,17 @@ def test_grizzly_harness(tmpdir):
     dump('test: failed: not expecting next_test to be reached\n')
     fuzzPriv.quitApplication()
     </script>'''
+    test2d = r'''<script>
+    dump('test: first test\n')
+    fuzzPriv.closeTabThenQuit()
+    </script>'''
+    test2e = r'''<script>
+    dump('test: next test\n')
+    window.close()
+    </script>'''
+    test2f = r'''<script>
+    dump('test: next test\n')
+    </script>'''
 
     class HtmlRequestHandler(http.server.SimpleHTTPRequestHandler):
         extensions_map = {'': 'text/html'}
@@ -148,6 +160,7 @@ def test_grizzly_harness(tmpdir):
     os.chdir(tmpdir)
     thread = None
     try:
+        # check that harness is used
         with open(os.path.join(tmpdir, 'harness'), 'w') as testfp:
             testfp.write(test2a)
         with open(os.path.join(tmpdir, 'first_test'), 'w') as testfp:
@@ -168,6 +181,71 @@ def test_grizzly_harness(tmpdir):
                 httpd.shutdown()
                 httpd.socket.close()
                 thread.join()
+        # check that next test is called multiple times
+        with open(os.path.join(tmpdir, 'first_test'), 'w') as testfp:
+            testfp.write(test2d)
+        with open(os.path.join(tmpdir, 'next_test'), 'w') as testfp:
+            testfp.write(test2e)
+        with socketserver.TCPServer(('', 0), HtmlRequestHandler) as httpd:
+            log.info('Serving at %s:%d', httpd.server_address[0], httpd.server_address[1])
+            thread = threading.Thread(target=httpd.serve_forever)
+            thread.start()
+            try:
+                location = 'http://127.0.0.1:%d/harness#10000' % httpd.server_address[1]
+                logs = run_ffp(FIREFOX, PREFS, location)
+                dump_logs(logs)
+                assert re.search(r'^test: first test$', logs['log_stdout'], re.MULTILINE) is not None
+                assert len(re.findall(r'^test: next test$', logs['log_stdout'], re.MULTILINE)) > 1
+            finally:
+                httpd.shutdown()
+                httpd.socket.close()
+                thread.join()
+        # check that timeout works
+        with open(os.path.join(tmpdir, 'next_test'), 'w') as testfp:
+            testfp.write(test2f)
+        with socketserver.TCPServer(('', 0), HtmlRequestHandler) as httpd:
+            log.info('Serving at %s:%d', httpd.server_address[0], httpd.server_address[1])
+            thread = threading.Thread(target=httpd.serve_forever)
+            thread.start()
+            try:
+                location = 'http://127.0.0.1:%d/harness#100' % httpd.server_address[1]
+                logs = run_ffp(FIREFOX, PREFS, location)
+                dump_logs(logs)
+                assert re.search(r'^test: first test$', logs['log_stdout'], re.MULTILINE) is not None
+                assert len(re.findall(r'^test: next test$', logs['log_stdout'], re.MULTILINE)) > 1
+            finally:
+                httpd.shutdown()
+                httpd.socket.close()
+                thread.join()
     finally:
         os.chdir(curd)
 
+
+def test_quitApplication(tmpdir):
+    test3 = r'''<script>
+    try { fuzzPriv.quitApplication() } catch (e) {}
+    setTimeout(() => dump('test: failed\n'), 500)
+    </script>'''
+    with open(os.path.join(tmpdir, 'test3.html'), 'w') as testfp:
+        testfp.write(test3)
+    logs = run_ffp(FIREFOX, PREFS, os.path.join(tmpdir, 'test3.html'))
+    dump_logs(logs)
+    assert re.search(r'^test: failed$', logs['log_stdout'], re.MULTILINE) is None
+
+
+def test_quitApplicationSoon(tmpdir):
+    test4 = r'''<script>
+    intervals = 0
+    try { fuzzPriv.quitApplicationSoon() } catch (e) {}
+    setInterval(() => {
+      intervals++
+      dump('test: ' + intervals + '\n')
+    }, 500)
+    </script>'''
+    with open(os.path.join(tmpdir, 'test4.html'), 'w') as testfp:
+        testfp.write(test4)
+    logs = run_ffp(FIREFOX, PREFS, os.path.join(tmpdir, 'test4.html'))
+    dump_logs(logs)
+    matches = list(re.finditer(r'^test: (\d+)$', logs['log_stdout'], re.MULTILINE))
+    assert matches, "setInterval should have run"
+    assert 7 <= int(matches[-1].group(1)) <= 9  # .5s intervals, should be about 4 seconds give or take
