@@ -1,12 +1,8 @@
 "use strict";
 
-const Cu = Components.utils;
-const Cc = Components.classes;
-const Ci = Components.interfaces;
-
-Cu.import("resource://gre/modules/XPCOMUtils.jsm");
-Cu.import("resource://gre/modules/Services.jsm");
-Cu.import("resource://gre/modules/NetUtil.jsm");
+ChromeUtils.import("resource://gre/modules/XPCOMUtils.jsm");
+ChromeUtils.import("resource://gre/modules/Services.jsm");
+ChromeUtils.import("resource://gre/modules/NetUtil.jsm");
 
 function dumpln(s) { dump(s + "\n"); }
 
@@ -44,21 +40,17 @@ DOMFuzzHelperObserver.prototype = {
     if (aTopic == "profile-after-change") {
       this.init();
     } else if (!this.isFrameScriptLoaded && aTopic == "chrome-document-global-created") {
-
-      var messageManager = Cc["@mozilla.org/globalmessagemanager;1"].
-                               getService(Ci.nsIMessageListenerManager || Ci.nsIChromeFrameMessageManager);
-
       // Register for any messages our API needs us to handle
-      messageManager.addMessageListener("DOMFuzzHelper.quitApplication", this);
-      messageManager.addMessageListener("DOMFuzzHelper.quitApplicationSoon", this);
-      messageManager.addMessageListener("DOMFuzzHelper.quitWithLeakCheck", this);
-      messageManager.addMessageListener("DOMFuzzHelper.getProfileDirectory", this);
-      messageManager.addMessageListener("DOMFuzzHelper.enableAccessibility", this);
-      messageManager.addMessageListener("DOMFuzzHelper.getBinDirectory", this);
-      messageManager.addMessageListener("DOMFuzzHelper.enableBookmarksToolbar", this);
-      messageManager.addMessageListener("DOMFuzzHelper.disableBookmarksToolbar", this);
+      Services.mm.addMessageListener("DOMFuzzHelper.quitApplication", this);
+      Services.mm.addMessageListener("DOMFuzzHelper.quitApplicationSoon", this);
+      Services.mm.addMessageListener("DOMFuzzHelper.quitWithLeakCheck", this);
+      Services.mm.addMessageListener("DOMFuzzHelper.getProfileDirectory", this);
+      Services.mm.addMessageListener("DOMFuzzHelper.enableAccessibility", this);
+      Services.mm.addMessageListener("DOMFuzzHelper.getBinDirectory", this);
+      Services.mm.addMessageListener("DOMFuzzHelper.enableBookmarksToolbar", this);
+      Services.mm.addMessageListener("DOMFuzzHelper.disableBookmarksToolbar", this);
 
-      messageManager.loadFrameScript("chrome://domfuzzhelper/content/fuzzPriv.js", true);
+      Services.mm.loadFrameScript("chrome://domfuzzhelper/content/fuzzPriv.js", true);
 
       this.isFrameScriptLoaded = true;
 
@@ -133,10 +125,7 @@ DOMFuzzHelperObserver.prototype = {
   /* nsICommandLineHandler */
   handle: function(cmdLine) {
     if (cmdLine.handleFlag("fuzzinject", false)) {
-      var messageManager = Cc["@mozilla.org/globalmessagemanager;1"].
-                               getService(Ci.nsIMessageListenerManager || Ci.nsIChromeFrameMessageManager);
-      messageManager.loadFrameScript("chrome://domfuzzhelper/content/inject.js", true);
-
+      Services.mm.loadFrameScript("chrome://domfuzzhelper/content/inject.js", true);
       cmdLine.preventDefault = true;
     }
   },
