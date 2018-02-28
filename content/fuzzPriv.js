@@ -292,60 +292,6 @@ function printToFile(window)
 {
   // Disabled completely for now.
   return function() { };
-
-  // Oddly asynchronous, at least on Linux.
-
-  // Linux: works for PDF and PS.
-  // Windows: works for PDF at least. Text may be invisible (bug 653336). showHeaders causes an abnormal exit. Fairly busted and unlikely to be fixed as a result of me filing bugs.
-  // Mac: tested, printToFile is ignored and it goes to a printer! (bug 675709)
-  var xulRuntime = Components.classes["@mozilla.org/xre/app-info;1"]
-                             .getService(Components.interfaces.nsIXULRuntime);
-  if (xulRuntime.OS != "Linux") return function() { };
-
-  var fired = false;
-
-  return function printToFileInner(showHeaders, showBGColor, showBGImages, ps) {
-    runSoon(function() {
-        // Don't print more than once, it gets messy fast.
-        if (fired) { return false; }
-        fired = true;
-
-        ps = ps && xulRuntime.OS != "WINNT"; // Windows gets confused when trying to print to ps, and tosses up a *.xps filepicker outside the Firefox process!?
-
-        // Based on https://addons.mozilla.org/en-US/firefox/addon/5971/ by pavlov (Stuart Parmenter) and bho
-
-        var webBrowserPrint = window.QueryInterface(Components.interfaces.nsIInterfaceRequestor)
-        .getInterface(Components.interfaces.nsIWebBrowserPrint);
-
-        var nsIPrintSettings = Components.interfaces.nsIPrintSettings;
-
-        var PSSVC = Components.classes["@mozilla.org/gfx/printsettings-service;1"]
-        .getService(Components.interfaces.nsIPrintSettingsService);
-
-        var printSettings = PSSVC.newPrintSettings;
-
-        var file = profileDirectory();
-        file.append(ps ? "fuzzout.ps" : "fuzzout.pdf");
-        dumpln("Printing to: " + file.path);
-
-        printSettings.printToFile = true;
-        printSettings.toFileName  = file.path;
-        printSettings.printSilent = true;
-        printSettings.outputFormat = ps ? nsIPrintSettings.kOutputFormatPS : nsIPrintSettings.kOutputFormatPDF;
-        printSettings.printBGColors   = !!showBGColor;
-        printSettings.printBGImages   = !!showBGImages;
-        if (!showHeaders) {
-            printSettings.footerStrCenter = '';
-            printSettings.footerStrLeft   = '';
-            printSettings.footerStrRight  = '';
-            printSettings.headerStrCenter = '';
-            printSettings.headerStrLeft   = '';
-            printSettings.headerStrRight  = '';
-        }
-
-        webBrowserPrint.print(printSettings, null);
-    });
-  };
 }
 
 
