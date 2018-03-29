@@ -5,9 +5,10 @@
 
   <Description about="urn:mozilla:install-manifest">
     <em:id>domfuzz@squarefree.com</em:id>
-    <em:version>2012.07.07</em:version>
+    <em:version>2018.03.29</em:version>
     <em:type>2</em:type>
     <em:multiprocessCompatible>true</em:multiprocessCompatible>
+    <em:bootstrap>true</em:bootstrap>
 
     <!-- Target Application this extension can install into,
          with minimum and maximum supported versions. -->

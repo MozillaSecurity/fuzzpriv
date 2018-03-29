@@ -4,7 +4,20 @@ ChromeUtils.import("resource://gre/modules/XPCOMUtils.jsm");
 ChromeUtils.import("resource://gre/modules/Services.jsm");
 ChromeUtils.import("resource://gre/modules/NetUtil.jsm");
 
+XPCOMUtils.defineLazyServiceGetter(this, "categoryManager",
+                                   "@mozilla.org/categorymanager;1",
+                                   "nsICategoryManager");
+
 function dumpln(s) { dump(s + "\n"); }
+
+const CHILD_SCRIPT = "chrome://domfuzzhelper/content/fuzzPriv.js";
+
+const Cm = Components.manager.QueryInterface(Ci.nsIComponentRegistrar);
+
+const CATMAN_CONTRACTID = "@mozilla.org/categorymanager;1";
+
+const CATEGORY_NAME = "command-line-handler";
+const CATEGORY_ENTRY = "m-fuzzinject";
 
 /*****************
  * API INJECTION *
@@ -17,59 +30,52 @@ function dumpln(s) { dump(s + "\n"); }
 // https://developer.mozilla.org/en/how_to_build_an_xpcom_component_in_javascript
 // https://developer.mozilla.org/en-US/docs/Command_Line (nsICommandLineHandler)
 
-function DOMFuzzHelperObserver() {
-}
+function DOMFuzzHelperObserver() {}
 
 DOMFuzzHelperObserver.prototype = {
+  factory:          XPCOMUtils._getFactory(DOMFuzzHelperObserver),
   classDescription: "DOMFuzz helper observer",
   classID:          Components.ID("{73DD0F4A-B201-44A1-8C56-D1D72432B02A}"),
-  contractID:       "@squarefree.com/dom-fuzz-helper-observer;1",
-  _xpcom_categories: [
-    {category: "profile-after-change", service: true },
-    {category: "command-line-handler", entry: "m-fuzzinject" },
-  ],
-  QueryInterface: XPCOMUtils.generateQI([
-    Ci.nsIObserver,
-    Ci.nsICommandLineHandler,
-  ]),
+  contractID:       "@mozilla.org/commandlinehandler/general-startup;1?type=fuzzinject",
+  QueryInterface:   XPCOMUtils.generateQI([Ci.nsICommandLineHandler]),
 
-  isFrameScriptLoaded: false,
-
-  /* nsIObserver */
-  observe: function(aSubject, aTopic, aData) {
-    if (aTopic == "profile-after-change") {
-      this.init();
-    } else if (!this.isFrameScriptLoaded && aTopic == "chrome-document-global-created") {
-      // Register for any messages our API needs us to handle
-      Services.mm.addMessageListener("DOMFuzzHelper.quitApplication", this);
-      Services.mm.addMessageListener("DOMFuzzHelper.quitApplicationSoon", this);
-      Services.mm.addMessageListener("DOMFuzzHelper.quitWithLeakCheck", this);
-      Services.mm.addMessageListener("DOMFuzzHelper.getProfileDirectory", this);
-      Services.mm.addMessageListener("DOMFuzzHelper.enableAccessibility", this);
-      Services.mm.addMessageListener("DOMFuzzHelper.getBinDirectory", this);
-      Services.mm.addMessageListener("DOMFuzzHelper.enableBookmarksToolbar", this);
-      Services.mm.addMessageListener("DOMFuzzHelper.disableBookmarksToolbar", this);
-
-      Services.mm.loadFrameScript("chrome://domfuzzhelper/content/fuzzPriv.js", true);
-
-      this.isFrameScriptLoaded = true;
-
-    } else if (aTopic == "xpcom-shutdown") {
-        this.uninit();
-    }
+  init() {
+    // Register for any messages our API needs us to handle
+    Services.mm.addMessageListener("DOMFuzzHelper.quitApplication", this);
+    Services.mm.addMessageListener("DOMFuzzHelper.quitApplicationSoon", this);
+    Services.mm.addMessageListener("DOMFuzzHelper.quitWithLeakCheck", this);
+    Services.mm.addMessageListener("DOMFuzzHelper.getProfileDirectory", this);
+    Services.mm.addMessageListener("DOMFuzzHelper.enableAccessibility", this);
+    Services.mm.addMessageListener("DOMFuzzHelper.getBinDirectory", this);
+    Services.mm.addMessageListener("DOMFuzzHelper.enableBookmarksToolbar", this);
+    Services.mm.addMessageListener("DOMFuzzHelper.disableBookmarksToolbar", this);
+    Services.mm.loadFrameScript(CHILD_SCRIPT, true);
   },
 
-  init: function() {
-    var obs = Services.obs;
-
-    obs.addObserver(this, "xpcom-shutdown", false);
-    obs.addObserver(this, "chrome-document-global-created", false);
+  register() {
+    Cm.registerFactory(this.classID, this.classDescription,
+                       this.contractID, this.factory);
+    categoryManager.addCategoryEntry(CATEGORY_NAME, CATEGORY_ENTRY,
+                                     this.contractID, false, true);
   },
 
-  uninit: function() {
-    var obs = Services.obs;
+  uninit() {
+    try { Services.obs.removeObserver(this, "chrome-document-global-created"); } catch(e) {}
+    Services.mm.removeMessageListener("DOMFuzzHelper.quitApplication", this);
+    Services.mm.removeMessageListener("DOMFuzzHelper.quitApplicationSoon", this);
+    Services.mm.removeMessageListener("DOMFuzzHelper.quitWithLeakCheck", this);
+    Services.mm.removeMessageListener("DOMFuzzHelper.getProfileDirectory", this);
+    Services.mm.removeMessageListener("DOMFuzzHelper.enableAccessibility", this);
+    Services.mm.removeMessageListener("DOMFuzzHelper.getBinDirectory", this);
+    Services.mm.removeMessageListener("DOMFuzzHelper.enableBookmarksToolbar", this);
+    Services.mm.removeMessageListener("DOMFuzzHelper.disableBookmarksToolbar", this);
+    Services.mm.removeDelayedFrameScript(CHILD_SCRIPT, true);
+  },
 
-    obs.removeObserver(this, "chrome-document-global-created", false);
+  unregister() {
+    categoryManager.deleteCategoryEntry(CATEGORY_NAME, CATEGORY_ENTRY,
+                                        this.contractID, false);
+    Cm.unregisterFactory(this.classID, this.factory);
   },
 
   /**
@@ -77,7 +83,7 @@ DOMFuzzHelperObserver.prototype = {
     * This will get requests from our API in the window and process them in chrome for it
     **/
 
-  receiveMessage: function(aMessage) {
+  receiveMessage(aMessage) {
     switch(aMessage.name) {
       case "DOMFuzzHelper.quitApplication":
         quitFromContent();
@@ -123,17 +129,19 @@ DOMFuzzHelperObserver.prototype = {
   },
 
   /* nsICommandLineHandler */
-  handle: function(cmdLine) {
+  handle(cmdLine) {
     if (cmdLine.handleFlag("fuzzinject", false)) {
       Services.mm.loadFrameScript("chrome://domfuzzhelper/content/inject.js", true);
       cmdLine.preventDefault = true;
     }
   },
-
+  commandLineArgument: "-fuzzinject",
+  helpText: "Enable injection of fuzz scripts",
+  handlesArgs: true,
+  defaultArgs: "",
+  openWindowWithArgs: true,
   helpInfo: "  -fuzzinject          Enable injection of fuzz scripts\n",
 };
-
-const NSGetFactory = XPCOMUtils.generateNSGetFactory([DOMFuzzHelperObserver]);
 
 
 /********************************************
@@ -449,3 +457,16 @@ function quitOnce()
     goQuitApplication();
   }
 }
+
+function startup(data, reason) {
+  DOMFuzzHelperObserver.prototype.init();
+  DOMFuzzHelperObserver.prototype.register();
+}
+
+function shutdown(data, reason) {
+  DOMFuzzHelperObserver.prototype.uninit();
+  DOMFuzzHelperObserver.prototype.unregister();
+}
+
+function install(data, reason) {}
+function uninstall(data, reason) {}
