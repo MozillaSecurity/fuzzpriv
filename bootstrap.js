@@ -1,8 +1,12 @@
 "use strict";
 
-ChromeUtils.import("resource://gre/modules/XPCOMUtils.jsm");
-ChromeUtils.import("resource://gre/modules/Services.jsm");
-ChromeUtils.import("resource://gre/modules/NetUtil.jsm");
+const Cu = Components.utils;
+const Cc = Components.classes;
+const Ci = Components.interfaces;
+
+Cu.import("resource://gre/modules/XPCOMUtils.jsm");
+Cu.import("resource://gre/modules/Services.jsm");
+Cu.import("resource://gre/modules/NetUtil.jsm");
 
 XPCOMUtils.defineLazyServiceGetter(this, "categoryManager",
                                    "@mozilla.org/categorymanager;1",
@@ -113,8 +117,8 @@ DOMFuzzHelperObserver.prototype = {
 
       case "DOMFuzzHelper.enableAccessibility":
         try {
-          Components.classes["@mozilla.org/accessibilityService;1"]
-            .getService(Components.interfaces.nsIAccessibilityService);
+          Cc["@mozilla.org/accessibilityService;1"]
+            .getService(Ci.nsIAccessibilityService);
           dump("Enabled accessibility!\n");
         } catch(e) {
           dump("Couldn't enable accessibility: " + e + "\n");
@@ -150,31 +154,31 @@ DOMFuzzHelperObserver.prototype = {
 
 function runSoon(f)
 {
-  var tm = Components.classes["@mozilla.org/thread-manager;1"]
-             .getService(Components.interfaces.nsIThreadManager);
+  var tm = Cc["@mozilla.org/thread-manager;1"]
+             .getService(Ci.nsIThreadManager);
 
   tm.mainThread.dispatch({
     run: function() {
       f();
     }
-  }, Components.interfaces.nsIThread.DISPATCH_NORMAL);
+  }, Ci.nsIThread.DISPATCH_NORMAL);
 }
 
 
 
 function getProfileDirectory()
 {
-  var d = Components.classes["@mozilla.org/file/directory_service;1"]
-                    .getService(Components.interfaces.nsIProperties)
-                    .get("ProfD", Components.interfaces.nsIFile);
+  var d = Cc["@mozilla.org/file/directory_service;1"]
+                    .getService(Ci.nsIProperties)
+                    .get("ProfD", Ci.nsIFile);
   return d.path;
 }
 
 function getBinDirectory()
 {
-  var d = Components.classes["@mozilla.org/file/directory_service;1"]
-                    .getService(Components.interfaces.nsIProperties)
-                    .get("CurProcD", Components.interfaces.nsIFile);
+  var d = Cc["@mozilla.org/file/directory_service;1"]
+                    .getService(Ci.nsIProperties)
+                    .get("CurProcD", Ci.nsIFile);
   return d.path;
 }
 
@@ -249,13 +253,13 @@ function quitWithLeakCheck(leaveWindowsOpen)
 var timerDeathGrip;
 function runOnTimer(f)
 {
-    timerDeathGrip = Components.classes["@mozilla.org/timer;1"].createInstance(Components.interfaces.nsITimer);
-    timerDeathGrip.initWithCallback({notify: function(){ timerDeathGrip=null; f(); }}, 4000, Components.interfaces.nsITimer.TYPE_ONE_SHOT);
+    timerDeathGrip = Cc["@mozilla.org/timer;1"].createInstance(Ci.nsITimer);
+    timerDeathGrip.initWithCallback({notify: function(){ timerDeathGrip=null; f(); }}, 4000, Ci.nsITimer.TYPE_ONE_SHOT);
 }
 
 function closeAllWindows()
 {
-  var ww = Components.classes["@mozilla.org/embedcomp/window-watcher;1"]
+  var ww = Cc["@mozilla.org/embedcomp/window-watcher;1"]
                      .getService(Ci.nsIWindowWatcher);
   var enumerator = ww.getWindowEnumerator();
 
@@ -285,8 +289,8 @@ function mpUntilDone(callback)
     ++j;
     if (j > 9)
       runSoon(callback);
-    else if (j % 2 == 1 && typeof Components.utils.schedulePreciseGC == "function")
-      Components.utils.schedulePreciseGC(mpUntilDoneInner);
+    else if (j % 2 == 1 && typeof Cu.schedulePreciseGC == "function")
+      Cu.schedulePreciseGC(mpUntilDoneInner);
     else
       runSoon(mpUntilDoneInner);
   }
@@ -354,8 +358,8 @@ function bloatStats(callback)
 
 function canQuitApplication()
 {
-  var os = Components.classes["@mozilla.org/observer-service;1"]
-    .getService(Components.interfaces.nsIObserverService);
+  var os = Cc["@mozilla.org/observer-service;1"]
+    .getService(Ci.nsIObserverService);
   if (!os)
   {
     return true;
@@ -363,8 +367,8 @@ function canQuitApplication()
 
   try
  {
-    var cancelQuit = Components.classes["@mozilla.org/supports-PRBool;1"]
-      .createInstance(Components.interfaces.nsISupportsPRBool);
+    var cancelQuit = Cc["@mozilla.org/supports-PRBool;1"]
+      .createInstance(Ci.nsISupportsPRBool);
     os.notifyObservers(cancelQuit, "quit-application-requested", null);
 
     // Something aborted the quit process.
@@ -394,18 +398,18 @@ function goQuitApplication()
   var   appService;
   var   forceQuit;
 
-  if (kAppStartup in Components.classes)
+  if (kAppStartup in Cc)
   {
-    appService = Components.classes[kAppStartup].
-      getService(Components.interfaces.nsIAppStartup);
-    forceQuit  = Components.interfaces.nsIAppStartup.eForceQuit;
+    appService = Cc[kAppStartup].
+      getService(Ci.nsIAppStartup);
+    forceQuit  = Ci.nsIAppStartup.eForceQuit;
 
   }
-  else if (kAppShell in Components.classes)
+  else if (kAppShell in Cc)
   {
-    appService = Components.classes[kAppShell].
-      getService(Components.interfaces.nsIAppShellService);
-    forceQuit = Components.interfaces.nsIAppShellService.eForceQuit;
+    appService = Cc[kAppShell].
+      getService(Ci.nsIAppShellService);
+    forceQuit = Ci.nsIAppShellService.eForceQuit;
   }
   else
   {
@@ -416,7 +420,7 @@ function goQuitApplication()
     classes['@mozilla.org/appshell/window-mediator;1'].getService();
 
   var windowManagerInterface = windowManager.
-    QueryInterface(Components.interfaces.nsIWindowMediator);
+    QueryInterface(Ci.nsIWindowMediator);
 
   var enumerator = windowManagerInterface.getEnumerator(null);
 
