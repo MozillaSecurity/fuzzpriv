@@ -110,7 +110,7 @@ function injectScript(doc, fuzzSettings)
 
   var script = doc.createElementNS("http://www.w3.org/1999/xhtml", "script");
   script.setAttribute("id", "fuzz1");
-  script.setAttribute("type", "text/javascript;version=1.7");
+  script.setAttribute("type", "text/javascript");
   script.textContent = scriptToInject;
   insertionPoint.appendChild(script);
 }
