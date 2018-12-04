@@ -41,7 +41,7 @@ DOMFuzzHelperObserver.prototype = {
   classDescription: "DOMFuzz helper observer",
   classID:          Components.ID("{73DD0F4A-B201-44A1-8C56-D1D72432B02A}"),
   contractID:       "@mozilla.org/commandlinehandler/general-startup;1?type=fuzzinject",
-  QueryInterface:   XPCOMUtils.generateQI([Ci.nsICommandLineHandler]),
+  QueryInterface:   ChromeUtils.generateQI([Ci.nsICommandLineHandler]),
 
   init() {
     // Register for any messages our API needs us to handle
