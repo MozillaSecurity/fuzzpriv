@@ -7,7 +7,7 @@
 
   "applications": {
     "gecko": {
-      "id": "fuzzpriv@fuzzing.mozilla.org"
+      "id": "domfuzz@squarefree.com"
     }
   },
 
